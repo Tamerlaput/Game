@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Ruelle Maudite</title>
+  <style>
+    body {
+      font-family: 'Courier New', monospace;
+      background: linear-gradient(to bottom, #0a0a0a, #1a0a0a);
+      color: #eee;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .game {
+      max-width: 600px;
+      width: 100%;
+      background: #1c1c1c;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 0 30px rgba(255, 0, 0, 0.3);
+      border: 2px solid #ff4d4d;
+    }
+    .stats {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #0a0a0a;
+      border-radius: 8px;
+      border: 1px solid #ff4d4d;
+    }
+    .stat {
+      text-align: center;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: #888;
+      text-transform: uppercase;
+    }
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #ff4d4d;
+    }
+    #story {
+      min-height: 150px;
+      line-height: 1.6;
+      margin-bottom: 20px;
+      padding: 15px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      font-size: 16px;
+    }
+    button {
+      width: 100%;
+      margin-top: 10px;
+      padding: 15px;
+      background: linear-gradient(to right, #ff4d4d, #cc0000);
+      border: none;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.3s;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+    }
+    button:hover {
+      background: linear-gradient(to right, #ff1f1f, #990000);
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(255, 0, 0, 0.4);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    .death {
+      color: #ff0000;
+      font-weight: bold;
+      animation: pulse 1s infinite;
+    }
+    .victory {
+      color: #00ff00;
+      font-weight: bold;
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .combat {
+      background: rgba(255, 0, 0, 0.1);
+      border-left: 4px solid #ff0000;
+      padding: 10px;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+<div class="game">
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">PV</div>
+      <div class="stat-value" id="hp">100</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Attaque</div>
+      <div class="stat-value" id="atk">10</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Argent</div>
+      <div class="stat-value" id="money">0</div>
+    </div>
+  </div>
+  <p id="story"></p>
+  <div id="choices"></div>
+</div>
+<script>
+  let playerStats = {
+    hp: 100,
+    maxHp: 100,
+    atk: 10,
+    money: 0,
+    inventory: []
+  };
+
+  const game = {
+    start: {
+      text: "🌙 Tu te réveilles dans une ruelle sombre, la tête qui tourne. Derniers souvenirs : une soirée qui a mal tourné. Du sang sur tes mains... pas le tien. Qu'est-ce qui s'est passé ?",
+      choices: [
+        { text: "🔍 Fouiller tes poches", next: "fouiller_poches" },
+        { text: "🚶 Explorer la ruelle", next: "ruelle" },
+        { text: "📱 Vérifier ton téléphone", next: "telephone" },
+        { text: "🗣️ Appeler à l'aide", next: "aide" }
+      ]
+    },
+    
+    fouiller_poches: {
+      text: "Tu trouves : un couteau ensanglanté, un préservatif usagé, et 50€. Charmant. Les souvenirs reviennent : la dispute, la femme, le type qui t'a regardé de travers...",
+      choices: [
+        { text: "💰 Prendre l'argent (+50€)", next: "prendre_argent", effect: () => playerStats.money += 50 },
+        { text: "🔪 Garder le couteau (+5 ATK)", next: "prendre_couteau", effect: () => playerStats.atk += 5 },
+        { text: "🤮 Vomir et partir", next: "ruelle" }
+      ]
+    },
+
+    prendre_argent: {
+      text: "L'argent sera toujours utile. Tu le ranges et continues.",
+      choices: [
+        { text: "➡️ Explorer la ruelle", next: "ruelle" }
+      ]
+    },
+
+    prendre_couteau: {
+      text: "Le couteau te donne une sensation de sécurité morbide. +5 ATK !",
+      choices: [
+        { text: "➡️ Explorer la ruelle", next: "ruelle" }
+      ]
+    },
+
+    telephone: {
+      text: "Ton téléphone est mort. Mais tu as 3 messages non lus de 'Inconnu' : '1/3 : Je sais ce que tu as fait', '2/3 : Tu ne peux pas t'échapper', '3/3 : Regarde derrière toi'",
+      choices: [
+        { text: "😨 Regarder derrière toi", next: "regarder_derriere" },
+        { text: "🏃 Courir sans regarder", next: "courir_aveugle" }
+      ]
+    },
+
+    regarder_derriere: {
+      text: "Personne. Juste ton ombre qui semble plus grande que d'habitude. Un rire lointain...",
+      choices: [
+        { text: "➡️ Continuer", next: "ruelle" }
+      ]
+    },
+
+    courir_aveugle: {
+      text: "Tu cours à l'aveugle et te cognes violemment contre un mur. -15 PV !",
+      choices: [
+        { text: "🤕 Te relever", next: "ruelle" }
+      ],
+      effect: () => {
+        playerStats.hp -= 15;
+        checkDeath();
+      }
+    },
+    
+    ruelle: {
+      text: "La ruelle s'étend devant toi. À gauche, une lumière rouge palpite (un sex-shop ?). À droite, des bruits de bagarre. Au fond, une silhouette immobile t'observe.",
+      choices: [
+        { text: "⬅️ Aller vers la lumière rouge", next: "sexshop" },
+        { text: "➡️ Aller vers les bruits", next: "bagarre" },
+        { text: "⬆️ Approcher la silhouette", next: "silhouette" },
+        { text: "💊 Chercher de la drogue", next: "drogue" }
+      ]
+    },
+
+    aide: {
+      text: "Tu cries à l'aide. Un silence lourd répond. Puis, des pas. Des pas rapides. Trop rapides.",
+      choices: [
+        { text: "🏃 Fuir immédiatement", next: "fuite_chase" },
+        { text: "🤜 Préparer le combat", next: "combat_ombre" }
+      ]
+    },
+
+    sexshop: {
+      text: "Le sex-shop 'Le Paradis Interdit' clignote devant toi. Une femme en latex fume dehors : 'Entre, chéri. Ou t'as peur ?' Elle rit d'un rire rauque.",
+      choices: [
+        { text: "🚪 Entrer dans le shop", next: "sexshop_inside" },
+        { text: "💬 Parler à la femme", next: "femme_latex" },
+        { text: "🚶 Passer ton chemin", next: "ruelle_suite" }
+      ]
+    },
+
+    sexshop_inside: {
+      text: "L'intérieur est sombre, éclairé de néons roses. Des sex-toys bizarres tapissent les murs. Le vendeur, un type chauve avec un sourire dérangeant : 'On a une promotion sur les menottes. Ou tu cherches... autre chose ?'",
+      choices: [
+        { text: "🛒 Acheter des menottes (20€)", next: "acheter_menottes" },
+        { text: "🤔 Demander 'autre chose'", next: "autre_chose" },
+        { text: "🏃 Partir vite fait", next: "ruelle_suite" },
+        { text: "🔪 Braquer le vendeur", next: "braquer_vendeur" }
+      ]
+    },
+
+    acheter_menottes: {
+      text: "Tu achètes les menottes. Le vendeur : 'Tu veux que je te montre comment ça marche ?' Il s'approche trop près...",
+      choices: [
+        { text: "😳 Accepter la 'démonstration'", next: "demo_hot" },
+        { text: "🚫 Refuser et partir", next: "ruelle_suite" },
+        { text: "👊 Le frapper", next: "combat_vendeur" }
+      ],
+      effect: () => {
+        if (playerStats.money >= 20) {
+          playerStats.money -= 20;
+          playerStats.inventory.push("menottes");
+        }
+      }
+    },
+
+    demo_hot: {
+      text: "Le vendeur ferme à clé. 'Détends-toi...' Ses mains expertes te menottent. Ça devient étrange, puis... plaisant ? Une heure plus tard, tu ressors, confus mais étrangement satisfait. +20 PV pour la relaxation ?",
+      choices: [
+        { text: "😵 Sortir en titubant", next: "ruelle_suite" }
+      ],
+      effect: () => {
+        playerStats.hp = Math.min(playerStats.hp + 20, playerStats.maxHp);
+      }
+    },
+
+    autre_chose: {
+      text: "Le vendeur te guide vers une porte arrière. 'Les vrais produits sont là.' C'est une salle avec des armes et de la drogue. 'Bienvenue dans mon vrai business.'",
+      choices: [
+        { text: "💉 Acheter de la drogue (30€)", next: "acheter_drogue" },
+        { text: "🔫 Acheter un flingue (100€)", next: "acheter_flingue" },
+        { text: "🚫 'Non merci' et partir", next: "ruelle_suite" }
+      ]
+    },
+
+    acheter_drogue: {
+      text: "Tu achètes un sachet. 'Cocaïne pure, mon ami.' Tu sniffes une ligne... PUTAIN ! +30 ATK temporaire mais -10 PV !",
+      choices: [
+        { text: "🤪 En reprendre", next: "overdose" },
+        { text: "😤 Résister et partir", next: "ruelle_suite" }
+      ],
+      effect: () => {
+        if (playerStats.money >= 30) {
+          playerStats.money -= 30;
+          playerStats.atk += 30;
+          playerStats.hp -= 10;
+          checkDeath();
+        }
+      }
+    },
+
+    overdose: {
+      text: "Tu sniffes tout le sachet. Ton cœur explose. Littéralement. Ton dernier souvenir : le plafond qui tourne. 💀 GAME OVER - OVERDOSE",
+      choices: [
+        { text: "💀 Recommencer", next: "start" }
+      ],
+      effect: () => {
+        playerStats.hp = 0;
+        checkDeath();
+      }
+    },
+
+    acheter_flingue: {
+      text: "Tu achètes le flingue. +50 ATK ! 'Fais gaffe, il est chargé.' Le vendeur te fait un clin d'œil étrange.",
+      choices: [
+        { text: "🔫 Partir avec le flingue", next: "ruelle_suite" }
+      ],
+      effect: () => {
+        if (playerStats.money >= 100) {
+          playerStats.money -= 100;
+          playerStats.atk += 50;
+          playerStats.inventory.push("flingue");
+        }
+      }
+    },
+
+    braquer_vendeur: {
+      text: "Tu sors ton couteau. Le vendeur sourit : 'Erreur, gamin.' Il appuie sur un bouton. Deux gorilles sortent de nulle part.",
+      choices: [
+        { text: "⚔️ COMBATTRE LES GORILLES", next: "combat_gorilles" },
+        { text: "🏃 FUIR", next: "fuite_echec" }
+      ]
+    },
+
+    combat_gorilles: {
+      text: "COMBAT ! Les deux gorilles ont 80 PV chacun. Ton attaque : " + playerStats.atk,
+      choices: [
+        { text: "👊 Attaquer", next: "combat_gorilles_suite" }
+      ]
+    },
+
+    combat_gorilles_suite: {
+      text: () => {
+        const damage = playerStats.atk * 2;
+        if (damage >= 160) {
+          return "Tu les massacres avec une violence inouïe ! Ils s'écroulent. Le vendeur : 'Respect... Prends tout ce que tu veux.' +200€ !";
+        } else if (damage >= 80) {
+          return "Tu en tues un, mais l'autre te frappe. -40 PV ! Tu fuis avec 50€.";
+        } else {
+          return "Tu es trop faible. Ils te tabassent. -60 PV ! Tu rampes dehors.";
+        }
+      },
+      choices: [
+        { text: "😰 Continuer", next: "ruelle_suite" }
+      ],
+      effect: () => {
+        const damage = playerStats.atk * 2;
+        if (damage >= 160) {
+          playerStats.money += 200;
+        } else if (damage >= 80) {
+          playerStats.money += 50;
+          playerStats.hp -= 40;
+        } else {
+          playerStats.hp -= 60;
+        }
+        checkDeath();
+      }
+    },
+
+    fuite_echec: {
+      text: "Tu essaies de fuir. Un gorille t'attrape et te fracasse contre le mur. -70 PV ! 'Reviens jamais, merde !'",
+      choices: [
+        { text: "🤕 Partir en boitant", next: "ruelle_suite" }
+      ],
+      effect: () => {
+        playerStats.hp -= 70;
+        checkDeath();
+      }
+    },
+
+    femme_latex: {
+      text: "La femme te regarde de haut en bas : 'T'as l'air perdu, bébé. J'peux te faire oublier tes problèmes... 80€ pour une heure de paradis.' Elle caresse ta joue.",
+      choices: [
+        { text: "💸 Accepter (80€)", next: "sexe_latex" },
+        { text: "🚫 Refuser poliment", next: "ruelle_suite" },
+        { text: "😈 Proposer un plan à trois avec le vendeur", next: "plan_trois" }
+      ]
+    },
+
+    sexe_latex: {
+      text: "Elle t'emmène dans une arrière-cour. Une heure de passion sauvage. Elle est... experte. Très experte. Tu ressors vidé mais satisfait. +30 PV pour le moral !",
+      choices: [
+        { text: "😊 Repartir satisfait", next: "ruelle_suite" }
+      ],
+      effect: () => {
+        if (playerStats.money >= 80) {
+          playerStats.money -= 80;
+          playerStats.hp = Math.min(playerStats.hp + 30, playerStats.maxHp);
+        }
+      }
+    },
+
+    plan_trois: {
+      text: "Elle éclate de rire : 'T'es cinglé ! J'aime ça.' Elle appelle le vendeur. Ce qui suit est... indescriptible. Bizarre. Génial ? Vous finissez tous les trois dans une position impossible. +50 PV ! Nouvelle compétence débloquée : PERVERSION",
+      choices: [
+        { text: "🤯 Repartir confus", next: "ruelle_suite" }
+      ],
+      effect: () => {
+        playerStats.hp = Math.min(playerStats.hp + 50, playerStats.maxHp);
+        playerStats.atk += 10;
+      }
+    },
+
+    bagarre: {
+      text: "Tu arrives sur une scène brutale : trois types tabassent un homme à terre. L'un d'eux te voit : 'Toi, dégage ou t'es le prochain !'",
+      choices: [
+        { text: "💪 Les affronter", next: "combat_gang" },
+        { text: "🏃 Fuir", next: "ruelle_suite" },
+        { text: "🤝 Les rejoindre pour tabasser le type", next: "rejoindre_gang" },
+        { text: "📹 Filmer et mettre sur internet", next: "filmer" }
+      ]
+    },
+
+    combat_gang: {
+      text: "COMBAT ! Les trois ont 50 PV chacun. Ton attaque totale fera la différence...",
+      choices: [
+        { text: "⚔️ ATTAQUER", next: "combat_gang_suite" }
+      ]
+    },
+
+    combat_gang_suite: {
+      text: () => {
+        const totalHP = 150;
+        const damage = playerStats.atk * 3;
+        if (damage >= totalHP) {
+          return "Tu les détruis tous ! FATALITY ! L'homme au sol : 'Merci... voilà 100€' Il disparaît.";
+        } else {
+          return "Tu en blesses un mais ils sont trop nombreux. -50 PV ! Tu fuis.";
+        }
+      },
+      choices: [
+        { text: "😓 Continuer", next: "ruelle_suite" }
+      ],
+      effect: () => {
+        const damage = playerStats.atk * 3;
+        if (damage >= 150) {
+          playerStats.money += 100;
+        } else {
+          playerStats.hp -= 50;
+        }
+        checkDeath();
+      }
+    },
+
+    rejoindre_gang: {
+      text: "Tu leur files un coup de pied dans les côtes du type. CRAC. 'Ouais ! T'es des nôtres maintenant !' Ils te donnent 30€. Vous tuez le type ensemble. Ton âme est un peu plus noire.",
+      choices: [
+        { text: "😈 Continuer avec eux", next: "gang_path" },
+        { text: "😰 Partir", next: "ruelle_suite" }
+      ],
+      effect: () => {
+        playerStats.money += 30;
+        playerStats.atk += 5;
+      }
+    },
+
+    gang_path: {
+      text: "Le gang t'accepte. 'On a un braquage prévu. T'es chaud ?' Ils sortent des flingues.",
+      choices: [
+        { text: "🔫 Faire le braquage", next: "braquage" },
+        { text: "🚫 Refuser et partir", next: "ruelle_suite" }
+      ]
+    },
+
+    braquage: {
+      text: "Vous braquezune épicerie. Le caissier sort un fusil. BANG ! L'un des tiens s'effondre. Combat ou fuite ?",
+      choices: [
+        { text: "🔫 Tirer sur le caissier", next: "tuer_caissier" },
+        { text: "🏃 Fuir comme un lâche", next: "fuite_braquage" }
+      ]
+    },
+
+    tuer_caissier: {
+      text: "Tu tires. Le caissier s'écroule. Vous prenez 500€ mais les sirènes approchent. Vous courez. CHOIX : où te cacher ?",
+      choices: [
+        { text: "🏠 Chez ta mère", next: "chez_mere" },
+        { text: "🌃 Sur les toits", next: "toits" },
+        { text: "🚗 Voler une voiture", next: "voler_voiture" }
+      ],
+      effect: () => {
+        playerStats.money += 500;
+      }
+    },
+
+    chez_mere: {
+      text: "Ta mère ouvre : 'ENCORE TOI ?! J'EN AI MARRE !' Elle appelle les flics. -100 PV de trahison émotionnelle. GAME OVER - ARRÊTÉ PAR MAMAN",
+      choices: [
+        { text: "😭 Recommencer", next: "start" }
+      ],
+      effect: () => {
+        playerStats.hp = 0;
+        checkDeath();
+      }
+    },
+
+    toits: {
+      text: "Tu grimpes sur les toits. Vue magnifique sur la ville en feu. Tu réalises : tu es libre. VICTOIRE - FIN : LE ROI DES TOITS 👑",
+      choices: [
+        { text: "🎮 Rejouer", next: "start" }
+      ]
+    },
+
+    voler_voiture: {
+      text: "Tu voles une Tesla. Elle se conduit toute seule. Tu roules vers le coucher de soleil avec 500€ en poche. VICTOIRE - FIN : ROAD TRIP CRIMINEL 🚗",
+      choices: [
+        { text: "🎮 Rejouer", next: "start" }
+      ]
+    },
+
+    filmer: {
+      text: "Tu filmes tout. La vidéo devient virale. 10 millions de vues. Tu gagnes 1000€ en pubs. Mais le gang te retrouve... -80 PV de vengeance !",
+      choices: [
+        { text: "😱 Fuir", next: "ruelle_suite" }
+      ],
+      effect: () => {
+        playerStats.money += 1000;
+        playerStats.hp -= 80;
+        checkDeath();
+      }
+    },
+
+    silhouette: {
+      text: "Tu t'approches. La silhouette est... toi. Exactement toi. Il sourit : 'Surpris ? Je suis ton côté sombre. Veux-tu fusionner ?'",
+      choices: [
+        { text: "🤝 Fusionner", next: "fusion" },
+        { text: "⚔️ Le combattre", next: "combat_clone" },
+        { text: "🏃 Fuir cette merde", next: "ruelle_suite" }
+      ]
+    },
+
+    fusion: {
+      text: "Vous fusionnez. Tu sens une puissance incroyable. +100 ATK ! +50 PV ! Mais tu deviens plus sombre... NOUVELLE FORME : DEMON INTÉRIEUR",
+      choices: [
+        { text: "😈 Accepter ta nature", next: "demon_path" }
+      ],
+      effect: () => {
+        playerStats.atk += 100;
+        playerStats.hp += 50;
+        playerStats.maxHp += 50;
+      }
+    },
+
+    demon_path: {
+      text: "Tu es maintenant un démon urbain. Tu domines la ruelle. Tous te craignent. Tu es... le roi. VICTOIRE - FIN : SEIGNEUR DES TÉNÈBRES 👹",
+      choices: [
+        { text: "🎮 Rejouer", next: "start" }
+      ]
+    },
+
+    combat_clone: {
+      text: "COMBAT CONTRE TOI-MÊME ! Il a tes stats exactes. C'est un combat à mort...",
+      choices: [
+        { text: "👊 COMBATTRE", next: "combat_clone_suite" }
+      ]
+    },
+
+    combat_clone_suite: {
+      text: "Vous vous battez pendant des heures. Match nul. Vous vous effondrez tous les deux. -50 PV. Tu te réveilles seul.",
+      choices: [
+        { text: "😵 Continuer", next: "ruelle_suite" }
+      ],
+      effect: () => {
+        playerStats.hp -= 50;
+        checkDeath();
+      }
+    },
+
+    drogue: {
+      text: "Tu fouilles et trouves une seringue pleine. Héroïne ? Ou... autre chose ? Un sans-abri te regarde : 'Fais pas ça, gamin...'",
+      choices: [
+        { text: "💉 Injecter quand même", next: "injection" },
+        { text: "🚫 Jeter la seringue", next: "ruelle_suite" },
+        { text: "🎁 Donner au sans-abri", next: "donner_sdf" }
+      ]
+    },
+
+    injection: {
+      text: "Tu injectes. EXPLOSION DE SENSATIONS ! C'était de l'adrénaline pure. +80 ATK pour 3 tours ! Mais -30 PV...",
+      choices: [
+        { text: "🤯 Continuer défoncé", next: "ruelle_suite" }
+      ],
+      effect: () => {
+        playerStats.atk += 80;
+        playerStats.hp -= 30;
+        checkDeath();
+      }
+    },
+
+    donner_sdf: {
+      text: "Le SDF : 'T'es bon, gamin. Tiens.' Il te donne un vieux revolver. +40 ATK ! 'C'était à mon fils... il est mort. Venge-le.'",
+      choices: [
+        { text: "🔫 Accepter le revolver", next: "ruelle_suite" }
+      ],
+      effect: () => {
+        playerStats.atk += 40;
+      }
+    },
+
+    ruelle_suite: {
+      text: "Tu continues dans la ruelle. Soudain, une porte s'ouvre. Une lumière aveuglante. Une voix : 'Entre... ton destin t'attend.'",
+      choices: [
+        { text: "🚪 Entrer dans la lumière", next: "final_choice" },
+        { text: "🏃 Fuir définitivement", next: "vraie_fuite" }
+      ]
+    },
+
+    final_choice: {
+      text: "Tu entres. C'est... un temple ? Un autel avec trois choix : UN CŒUR (amour), UN CRÂNE (pouvoir), UN SAC D'OR (richesse).",
+      choices: [
+        { text: "❤️ Choisir le CŒUR", next: "fin_amour" },
+        { text: "💀 Choisir le CRÂNE", next: "fin_pouvoir" },
+        { text: "💰 Choisir l'OR", next: "fin_richesse" }
+      ]
+    },
+
+    fin_amour: {
+      text: "Tu touches le cœur. Tous tes souvenirs violents s'effacent. Tu te réveilles chez toi. C'était un rêve ? Ta copine est là. Vous vous embrassez. VICTOIRE - FIN : RÉDEMPTION PAR L'AMOUR ❤️",
+      choices: [
+        { text: "🎮 Rejouer", next: "start" }
+      ]
+    },
+
+    fin_pouvoir: {
+      text: "Le crâne t'absorbe. Tu deviens un dieu de la destruction. Tu domines le monde. Seul. Éternellement seul. VICTOIRE - FIN : LE DIEU SOLITAIRE 💀",
+      choices: [
+        { text: "🎮 Rejouer", next: "start" }
+      ]
+    },
+
+    fin_richesse: {
+      text: "L'or se multiplie à l'infini. Tu es milliardaire. Mais vide à l'intérieur. Tu achètes tout. Mais rien n'a de sens. VICTOIRE - FIN : LE ROI VIDE 💰",
+      choices: [
+        { text: "🎮 Rejouer", next: "start" }
+      ]
+    },
+
+    vraie_fuite: {
+      text: "Tu cours. Tu cours sans arrêt. Tu quittes la ville. Tu changes de nom. Nouvelle vie. Mais les cauchemars restent... VICTOIRE (?) - FIN : LE FUGITIF 🏃",
+      choices: [
+        { text: "🎮 Rejouer", next: "start" }
+      ]
+    },
+
+    combat_ombre: {
+      text: "Une créature sort de l'ombre. Elle a 100 PV. C'est la manifestation de ta culpabilité.",
+      choices: [
+        { text: "👊 COMBATTRE", next: "combat_ombre_suite" }
+      ]
+    },
+
+    combat_ombre_suite: {
+      text: () => {
+        const damage = playerStats.atk;
+        if (damage >= 100) {
+          return "Tu détruis la créature ! Ta culpabilité s'évapore. +50 PV ! Tu es libre.";
+        } else {
+          return "Elle te draine. -60 PV. 'Tu ne peux pas m'échapper...' Elle disparaît.";
+        }
+      },
+      choices: [
+        { text: "😰 Continuer", next: "ruelle_suite" }
+      ],
+      effect: () => {
+        if (playerStats.atk >= 100) {
+          playerStats.hp = Math.min(playerStats.hp + 50, playerStats.maxHp);
+        } else {
+          playerStats.hp -= 60;
+        }
+        checkDeath();
+      }
+    },
+
+    fuite_chase: {
+      text: "Tu cours. Les pas te suivent. Ton cœur explose. Tu tombes. Noir. Tu te réveilles... ailleurs. NOUVELLE DIMENSION ?",
+      choices: [
+        { text: "❓ Explorer", next: "dimension_wtf" }
+      ]
+    },
+
+    dimension_wtf: {
+      text: "Tout est rouge. Le ciel saigne. Des créatures volent. L'une te parle : 'Bienvenue en Enfer. Ou au Paradis. On ne sait plus trop.' Elle rit.",
+      choices: [
+        { text: "😈 'Je veux être le roi ici'", next: "roi_enfer" },
+        { text: "🙏 'Laissez-moi partir'", next: "partir_enfer" },
+        { text: "💋 'Tu es sexy pour un démon'", next: "sexe_demon" }
+      ]
+    },
+
+    roi_enfer: {
+      text: "Le démon te teste. COMBAT FINAL ! Il a 200 PV. S'il te reste plus de 50 PV et 150+ ATK, tu gagnes.",
+      choices: [
+        { text: "⚔️ COMBATTRE", next: "combat_roi_enfer" }
+      ]
+    },
+
+    combat_roi_enfer: {
+      text: () => {
+        if (playerStats.hp > 50 && playerStats.atk >= 150) {
+          return "TU LE DÉTRUIS ! Tous les démons s'inclinent. Tu es le nouveau ROI DE L'ENFER ! VICTOIRE ULTIME 👑😈";
+        } else {
+          return "Il te pulvérise. Tu deviens son esclave éternel. GAME OVER - ESCLAVE DÉMONIAQUE";
+        }
+      },
+      choices: [
+        { text: "🎮 Rejouer", next: "start" }
+      ],
+      effect: () => {
+        if (playerStats.hp <= 50 || playerStats.atk < 150) {
+          playerStats.hp = 0;
+          checkDeath();
+        }
+      }
+    },
+
+    partir_enfer: {
+      text: "Le démon : 'Très bien. Mais tu oublieras tout.' FLASH. Tu te réveilles dans ton lit. C'était... quoi ? GAME OVER - AMNÉSIE TOTALE",
+      choices: [
+        { text: "🎮 Rejouer", next: "start" }
+      ]
+    },
+
+    sexe_demon: {
+      text: "Le démon sourit : 'Audacieux...' Une nuit de passion interdimensionnelle. C'était... indescriptible. Tu reviens sur Terre avec des pouvoirs. +100 ATK ! +100 PV !",
+      choices: [
+        { text: "😈 Retourner conquérir", next: "retour_puissant" }
+      ],
+      effect: () => {
+        playerStats.atk += 100;
+        playerStats.hp += 100;
+        playerStats.maxHp += 100;
+      }
+    },
+
+    retour_puissant: {
+      text: "Tu retournes dans ta ruelle. Mais tu es changé. Surpuissant. Tout le monde te craint. Tu contrôles tout. VICTOIRE - FIN : LE HYBRIDE DÉMONIAQUE 😈✨",
+      choices: [
+        { text: "🎮 Rejouer", next: "start" }
+      ]
+    },
+
+    fuite_braquage: {
+      text: "Tu fuis. Le gang te traite de lâche. Tu es seul. Avec 0€. Pathétique. GAME OVER - LA HONTE",
+      choices: [
+        { text: "💀 Recommencer", next: "start" }
+      ]
+    },
+
+    combat_vendeur: {
+      text: "Tu frappes le vendeur. Il tombe. Mais il appuie sur un bouton d'alarme. Alarme à la police ! -20 PV de stress !",
+      choices: [
+        { text: "🏃 Fuir vite", next: "ruelle_suite" }
+      ],
+      effect: () => {
+        playerStats.hp -= 20;
+        checkDeath();
+      }
+    }
+  };
+
+  function updateStats() {
+    document.getElementById("hp").textContent = playerStats.hp;
+    document.getElementById("atk").textContent = playerStats.atk;
+    document.getElementById("money").textContent = playerStats.money;
+  }
+
+  function checkDeath() {
+    if (playerStats.hp <= 0) {
+      return true;
+    }
+    return false;
+  }
+
+  function showScene(sceneKey) {
+    const scene = game[sceneKey];
+    const storyEl = document.getElementById("story");
+    const choicesEl = document.getElementById("choices");
+    
+    // Apply effects first
+    if (scene.effect) {
+      scene.effect();
+    }
+    
+    // Check death after effects
+    if (checkDeath() && sceneKey !== 'start') {
+      storyEl.innerHTML = "<span class='death'>💀 TU ES MORT 💀</span><br>Points de vie épuisés...";
+      choicesEl.innerHTML = "";
+      const btn = document.createElement("button");
+      btn.textContent = "💀 Recommencer";
+      btn.onclick = () => {
+        playerStats = { hp: 100, maxHp: 100, atk: 10, money: 0, inventory: [] };
+        updateStats();
+        showScene("start");
+      };
+      choicesEl.appendChild(btn);
+      return;
+    }
+    
+    // Display story text
+    if (typeof scene.text === 'function') {
+      storyEl.textContent = scene.text();
+    } else {
+      storyEl.textContent = scene.text;
+    }
+    
+    // Display choices
+    choicesEl.innerHTML = "";
+    scene.choices.forEach(choice => {
+      const btn = document.createElement("button");
+      btn.textContent = choice.text;
+      btn.onclick = () => {
+        if (choice.effect) {
+          choice.effect();
+        }
+        showScene(choice.next);
+      };
+      choicesEl.appendChild(btn);
+    });
+    
+    updateStats();
+  }
+  
+  // Start game
+  showScene("start");
+</script>
+</body>
+</html>
